@@ -3,3 +3,4 @@
 print("Nelokomotivovatější lokomotiva")
 print("Hynek Udělal nějakou práci")
 print("Hynek udělal nějakou další práci")
+print("Honza udělal nějakou práci")
