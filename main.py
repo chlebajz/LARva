@@ -1,6 +1,16 @@
 #The main file -> TO RUN THIS PROJECT run this file
+from robolab_turtlebot import Turtlebot
+import pilot
+import navigator
 
-print("Nelokomotivovatější lokomotiva")
-print("Hynek Udělal nějakou práci")
-print("Hynek udělal nějakou další práci")
-print("Honza udělal nějakou práci")
+robot = Turtlebot(rgb=True, depth=True)
+navigator = navigator.Navigator()
+pilot = pilot.Pilot(robot, navigator)
+
+pilot.rotate2zero()
+pilot.drive()
+
+
+
+
+
