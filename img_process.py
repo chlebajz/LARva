@@ -19,22 +19,23 @@ def distance(robot_pos, Bannister): # function to get the distance from the bann
 
 def print_bannisters(bannisters, robot_pos): # for debugging purposes
     for i in range(len(bannisters)):
-        print("Bannister {}:".format(i), bannisters[i], "distance:", distance(robot_pos, bannisters[i]))
+        stand = "standing" if bannisters[i].standing else "fallen"
+        print("position: [{:.3}, {:.3}, {:.3}]".format(bannisters[i].x, bannisters[i].y, bannisters[i].z) + ", color: '" + bannisters[i].color + "', state: " + stand, "distance:", distance(robot_pos, bannisters[i]))
 
 def process(img, depth_img, K_RGB):
     def distance_from_rgb(x, y, w , h):
         # code from LAR laboratory
         u1_homogeneous = np.array([(y+h)/2, x, 1])
         u2_homogeneous = np.array([(y+h)/2, x+w , 1])
-        x1 = np.linalg.inv(K_RGB) @ u1_homogeneous
-        x2 = np.linalg.inv(K_RGB) @ u2_homogeneous
+        x1 = np.matmul(np.linalg.inv(K_RGB), u1_homogeneous)
+        x2 = np.matmul(np.linalg.inv(K_RGB), u2_homogeneous)
         cos_alpha = np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
         alpha = np.arccos(cos_alpha)
         return 0.025 / np.sin(alpha / 2)
 
     def real_position(x, y, z):
         u_mid_homogeneous = np.array([y, x, 1])
-        return np.linalg.inv(K_RGB) @ u_mid_homogeneous * z
+        return np.matmul(np.linalg.inv(K_RGB), u_mid_homogeneous) * z
 
     HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     color_min = [(0, 35, 25), (49, 30, 25), (107, 30, 25)] # for R, G, B in format (h_min, s_min, v_min)
@@ -62,8 +63,9 @@ def process(img, depth_img, K_RGB):
             else: #invalid ratio
                 continue
             mid = (int(x + w / 2), int(y + h / 2))
-            z = depth_img[mid[0], mid[1]]
+            z = depth_img[mid[1], mid[0]]
             if z is None:
+                print("baf")
                 z = distance_from_rgb(x, y, w, h)
             b_x, b_y, b_z = real_position(mid[0], mid[1], z)
             new = Bannister(color, b_x, b_y, b_z, standing)

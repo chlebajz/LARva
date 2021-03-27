@@ -1,5 +1,5 @@
 from robolab_turtlebot import Rate, get_time
-import numpy
+import numpy as np
 
 #class responsible for driving the robot along a specified path
 class Pilot():
@@ -22,13 +22,13 @@ class Pilot():
         v = 0.1
         prevDist = float('Inf')
         distance = self.getDistance(point)
-        while (distance > 0.01 and distance < prevDist):
+        while (distance > 0.02 and distance < prevDist):
             self.robot.cmd_velocity(linear=v)
             prevDist = distance
             self.rate.sleep()
             distance = self.getDistance(point)
-        if not (distance < 0.02):
-            print("INFO: Addjustment needed")
+        if not (distance < 0.05):
+            print("INFO: Adjustment needed to reach: ", point)
             angle = self.getBearing(point)
             self.setBearing(angle)
             self.driveTo(point)
@@ -44,7 +44,7 @@ class Pilot():
         curAngle = self.getCurrentPos()[2]
         self.start = False
         da = angle - curAngle
-        v = numpy.sign(da)*0.1
+        v = np.sign(da)*0.1
         angleInt = angle
         while (v > 0 and curAngle < angleInt) or (v < 0 and curAngle > angleInt):
             self.robot.cmd_velocity(angular=v)
@@ -56,13 +56,13 @@ class Pilot():
         dx = point[0] - currentPos[0]
         dy = point[1] - currentPos[1]
         if (dx != 0):
-            angle = numpy.arctan(dy/dx)
+            angle = np.arctan(dy/dx)
         else:
-            angle = numpy.pi/2
+            angle = np.pi/2
         if (dx < 0 ):
-            angle += numpy.pi
-        if (angle > numpy.pi):
-            angle -=2*numpy.pi
+            angle += np.pi
+        if (angle > np.pi):
+            angle -=2*np.pi
         return angle
 
     #At the start, fix the skew of the robot
@@ -83,3 +83,6 @@ class Pilot():
             return [0, 0, 0]
         else:
             return self.robot.get_odometry()
+
+    def getRGBKmatrix(self):
+        return self.robot.get_rgb_K()
