@@ -19,14 +19,17 @@ def distance(robot_pos, Bannister): # function to get the distance from the bann
 
 def print_bannisters(bannisters, robot_pos): # for debugging purposes
     for i in range(len(bannisters)):
-        stand = "standing" if bannisters[i].standing else "fallen"
-        print("position: [{:.3}, {:.3}, {:.3}]".format(bannisters[i].x, bannisters[i].y, bannisters[i].z) + ", color: '" + bannisters[i].color + "', state: " + stand, "distance:", distance(robot_pos, bannisters[i]))
+        print("Bannister {}:".format(i), bannisters[i], "distance:", distance(robot_pos, bannisters[i]))
 
 def process(img, depth_img, K_RGB):
-    def distance_from_rgb(x, y, w , h):
+    def distance_from_rgb(x, y, w, h, standing):
         # code from LAR laboratory
-        u1_homogeneous = np.array([(y+h)/2, x, 1])
-        u2_homogeneous = np.array([(y+h)/2, x+w , 1])
+        if standing:
+            u1_homogeneous = np.array([x, (y + h) / 2, 1])
+            u2_homogeneous = np.array([x + w, (y + h) / 2, 1])
+        else:
+            u1_homogeneous = np.array([(x + w) / 2, y, 1])
+            u2_homogeneous = np.array([(x + w) / 2, (y + h), 1])
         x1 = np.matmul(np.linalg.inv(K_RGB), u1_homogeneous)
         x2 = np.matmul(np.linalg.inv(K_RGB), u2_homogeneous)
         cos_alpha = np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
@@ -34,7 +37,7 @@ def process(img, depth_img, K_RGB):
         return 0.025 / np.sin(alpha / 2)
 
     def real_position(x, y, z):
-        u_mid_homogeneous = np.array([y, x, 1])
+        u_mid_homogeneous = np.array([x, y, 1])
         return np.matmul(np.linalg.inv(K_RGB), u_mid_homogeneous) * z
 
     HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -65,8 +68,7 @@ def process(img, depth_img, K_RGB):
             mid = (int(x + w / 2), int(y + h / 2))
             z = depth_img[mid[1], mid[0]]
             if z is None:
-                print("baf")
-                z = distance_from_rgb(x, y, w, h)
+                z = distance_from_rgb(x, y, w, h, standing)
             b_x, b_y, b_z = real_position(mid[0], mid[1], z)
             new = Bannister(color, b_x, b_y, b_z, standing)
             bannisters.append(new)
