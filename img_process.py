@@ -4,15 +4,30 @@ import math
 
 class Bannister:
     '''Class to store found bannisters'''
-    def __init__(self, color, x, y, z, standing):
+    def __init__(self, color, coord, standing):
         self.color = color
+        self.coord = coord
+        self.standing = standing
+    def __repr__(self):      # for printing
+        stand = "standing" if self.standing else "fallen"
+        # Python 3
+        # return "position: [{:.3}, {:.3}, {:.3}]".format(self.x, self.y, self.z) + ", color: '" + self.color + "', state: " + stand
+        # Python 2
+        return "\n{position: " + str(self.coord) + ", color: '" + self.color + "', state: " + stand + "}"
+
+class Coordinates:
+    '''Class to store coordinates'''
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
-        self.standing = standing
-    def __str__(self):      # for printing
-        stand = "standing"if self.standing else "fallen"
-        return "position: [{:.3}, {:.3}, {:.3}]".format(self.x, self.y, self.z) + ", color: '" + self.color + "', state: " + stand
+    def __repr__(self):  # for printing
+        # Python 3
+        # return "[{:.3}, {:.3}, {:.3}]".format(self.x, self.y, self.z)
+        # Python 2
+        return "[%.3f, %.3f, %.3f]" % (self.x, self.y, self.z)
+    def numpyfy(self):
+        return np.array([self.x, self.y, self.z])
 
 def distance(robot_pos, Bannister): # function to get the distance from the bannister
     return math.sqrt(pow((Bannister.x - robot_pos[0]), 2) + pow((Bannister.y - robot_pos[1]), 2) + pow((Bannister.z - robot_pos[2]), 2))
@@ -38,7 +53,8 @@ def process(img, depth_img, K_RGB):
 
     def real_position(x, y, z):
         u_mid_homogeneous = np.array([x, y, 1])
-        return np.matmul(np.linalg.inv(K_RGB), u_mid_homogeneous) * z
+        new_x, new_y, new_z = np.matmul(np.linalg.inv(K_RGB), u_mid_homogeneous * z)
+        return Coordinates(new_z, new_x, new_y) # swap the axes because the point is in camera coordinates
 
     HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     color_min = [(0, 35, 25), (49, 30, 25), (107, 30, 25)] # for R, G, B in format (h_min, s_min, v_min)
@@ -69,7 +85,32 @@ def process(img, depth_img, K_RGB):
             z = depth_img[mid[1], mid[0]]
             if z is None:
                 z = distance_from_rgb(x, y, w, h, standing)
-            b_x, b_y, b_z = real_position(mid[0], mid[1], z)
-            new = Bannister(color, b_x, b_y, b_z, standing)
+            else:
+                z += 0.025 # convert to distance from the middle of the bannsiter
+            pos = real_position(mid[0], mid[1], z) # position in camera coordinates
+            new = Bannister(color, pos, standing)
             bannisters.append(new)
     return bannisters
+
+def convert_to_real_coord(robot_x, robot_y, robot_theta, coordinates):
+    To = np.array([[math.cos(robot_theta), (-1)*math.sin(robot_theta), robot_x],
+                  [math.sin(robot_theta), math.cos(robot_theta), robot_y],
+                  [0, 0, 1]])
+    return np.matmul(To, np.transpose(coordinates.numpyfy()))
+
+if __name__ == "__main__": # For testing purposes
+    img = cv2.imread("Resources/Robot_view_png.png")
+    depth = np.full((480, 640), None)
+    K_RGB = np.array([[554.25469119, 0, 320.5],
+                      [0, 554.25469119, 240.5],
+                      [0, 0, 1]])
+    bannisters = process(img, depth, K_RGB)
+    # c = Coordinates(0, 1, 0)
+    # b = Bannister("Green", c, True)
+    # bannisters = [b]
+    print(bannisters)
+    print(convert_to_real_coord(0, 0, 0, bannisters[0].coord))
+    print(convert_to_real_coord(0, 0, 0, bannisters[1].coord))
+    print(convert_to_real_coord(0, 0, 0, bannisters[2].coord))
+    cv2.imshow("Image", img)
+    cv2.waitKey(0)
