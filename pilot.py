@@ -3,15 +3,13 @@ import numpy as np
 
 #class responsible for driving the robot along a specified path
 class Pilot():
-    def __init__(self, robot, navigator):
+    def __init__(self, robot):
         self.robot = robot
-        self.navigator = navigator
         self.rate = Rate(10)
         self.start = True
         print("INFO: Pilot has been initialized")
 
-    def drive(self):
-        path = self.navigator.getPath()
+    def drive(self, path):
         for step in path:
             angle = self.getBearing(step)
             self.setBearing(angle)
