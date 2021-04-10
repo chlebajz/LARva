@@ -10,13 +10,15 @@ class Pilot():
         print("INFO: Pilot has been initialized")
 
     def drive(self, path):
+        print(path)
+        self.start = True
+        self.robot.reset_odometry()
         for step in path:
             angle = self.getBearing(step)
             self.setBearing(angle)
             self.driveTo(step)
 
     def driveTo(self, point):
-        self.start = False
         v = 0.1
         prevDist = float('Inf')
         distance = self.getDistance(point)
@@ -63,7 +65,7 @@ class Pilot():
             angle -=2*np.pi
         return angle
 
-    #At the start, fix the skew of the robot
+    #Fix the skew of the robot for testing
     def rotate2zero(self):
         if self.start:
             t = get_time()
@@ -77,10 +79,10 @@ class Pilot():
             print("ERROR: Rotate2zero function can be called only on startup")
 
     def getCurrentPos(self):
-        if self.start:
-            return [0, 0, 0]
-        else:
-            return self.robot.get_odometry()
+        odometry = self.robot.get_odometry()
+        if (self.start or odometry is None):
+            odometry = [0, 0, 0]
+        return odometry
 
     def getRGBKmatrix(self):
         return self.robot.get_rgb_K()

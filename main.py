@@ -5,6 +5,8 @@ import navigator
 robot = Turtlebot(rgb=True, depth=True)
 navigator = navigator.Navigator(robot)
 
+navigator.toppleRedCone()
+
 
 
 
