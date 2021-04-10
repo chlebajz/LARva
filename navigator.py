@@ -35,6 +35,8 @@ class Navigator():
             if (self.cones[x][2] == 'r'):
                 redCone = (self.cones[x][0], self.cones[x][1])
                 break
+        if (redCone is None):
+            redCone = self.goal # don't forget to add coordinate transform
         self.goal = redCone
 
     def findPath(self, goal):
