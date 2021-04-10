@@ -9,17 +9,20 @@ class Pilot():
         self.start = True
         print("INFO: Pilot has been initialized")
 
-    def drive(self, path):
+    def drive(self, path, topple):
         print(path)
-        self.start = True
-        self.robot.reset_odometry()
-        for step in path:
-            angle = self.getBearing(step)
+        self.resetPosition()
+        for x in range(len(path)):
+            angle = self.getBearing(path[x])
             self.setBearing(angle)
-            self.driveTo(step)
+            self.driveTo(path[x], (x == len(path)-1) and topple)
 
-    def driveTo(self, point):
-        v = 0.1
+#drives to point in a straight line
+    def driveTo(self, point, topple):
+        if topple:
+            v = 1
+        else:
+            v = 0.2
         prevDist = float('Inf')
         distance = self.getDistance(point)
         while (distance > 0.02 and distance < prevDist):
@@ -31,7 +34,7 @@ class Pilot():
             print("INFO: Adjustment needed to reach: ", point)
             angle = self.getBearing(point)
             self.setBearing(angle)
-            self.driveTo(point)
+            self.driveTo(point, False)
 
     def getDistance(self, point):
         currentPos = self.getCurrentPos()
@@ -40,6 +43,7 @@ class Pilot():
         distance = ((dx ** 2) + (dy ** 2)) ** 0.5
         return distance
 
+#rotates the robot angle radians
     def setBearing(self, angle):
         curAngle = self.getCurrentPos()[2]
         self.start = False
@@ -85,4 +89,11 @@ class Pilot():
         return odometry
 
     def getRGBKmatrix(self):
-        return self.robot.get_rgb_K()
+        try:
+            kRGB = self.robot.get_rgb_K()
+        except:
+            kRGB = np.array([[554.25469119, 0, 320.5], [0, 554.25469119, 240.5], [0, 0, 1]])
+        return kRGB
+    def resetPosition(self):
+        self.robot.reset_odometry()
+        self.start = True

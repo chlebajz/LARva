@@ -1,42 +1,58 @@
 import pilot
 import img_process as img
 import frontier
+import Cone
+import Coordinates as xyz
 
 #Class responsible for navigation
 class Navigator():
     def __init__(self, robot):
         self.pilot = pilot.Pilot(robot)
-        self.cones = [(1, -0.5, 'r'), (1, 0.5, 'b'), (2, 0.25, 'g'), (2, -0.75, 'g')]
+        self.cones = []
         self.path = []
+        self.toppledCones=[]
         self.goal = None
         self.stateDistance = 0.2
-        self.allowedConeDistance = 0.2
+        self.keepConeDistance = 0.3
         self.acceptedPathLenght = 5
         self.explored = []
+        self.kRGB = self.pilot.getRGBKmatrix()
 
         self.pilot.rotate2zero() #only for testing
+        self.pilot.resetPosition()
         print("INFO: Navigator is now initialized")
 
     def toppleRedCone(self):
         reached = False
+        lastPos = (0, 0)
         while (not reached):
-            self.setGoal()
+            self.setGoal(lastPos)
             self.findPath(self.goal)
-            if (len(self.path) > self.acceptedPathLenght):
-                self.pilot.drive(self.path[:self.acceptedPathLenght])
+            if (len(self.path) > self.acceptedPathLenght+2):
+                print("Driving only partial path")
+                lastPos = self.path[self.acceptedPathLenght]
+                print(lastPos)
+                self.pilot.drive(self.path[:self.acceptedPathLenght], False)
                 self.scanForCones()
             else:
-                self.pilot.drive(self.path)
+                print("Driving to the goal")
+                self.pilot.drive(self.path, True)
                 reached = True
+        self.toppledCones.append(self.goal)
+        self.goal = None
+        print("Cone toppled")
 
-    def setGoal(self):
+    def setGoal(self, lastPos):
         redCone = None
         for x in range(len(self.cones)):
-            if (self.cones[x][2] == 'r'):
-                redCone = (self.cones[x][0], self.cones[x][1])
+            if (self.cones[x].color == 'Red'):
+                redCone = (self.cones[x].coord.x, self.cones[x].coord.y)
                 break
         if (redCone is None):
             redCone = self.goal # don't forget to add coordinate transform
+            redCone[0] -= lastPos[0]
+            redCone[1] -= lastPos[1]
+            print("Goal is invisible, using old goal: ", self.goal, "New coords: ", redCone)
         self.goal = redCone
 
     def findPath(self, goal):
@@ -79,8 +95,7 @@ class Navigator():
         while (x < len(states)):
             rem = False
             for cone in self.cones:
-                if (self.isCloseToCone(states[x][0], cone, True)):
-                    print(cone)
+                if (self.isCloseToCone(states[x][0], (cone.coord.x, cone.coord.y), True)):
                     states.remove(states[x])
                     remNum += 1
                     rem = True
@@ -91,9 +106,9 @@ class Navigator():
     def isCloseToCone(self, state, cone, excludeGoal):
         dist = (((state[0]-cone[0])**2)+((state[1]-cone[1])**2))**0.5
         if (excludeGoal):
-            return dist <= self.allowedConeDistance and not (cone[0] == self.goal[0] and cone[1] == self.goal[1])
+            return dist <= self.keepConeDistance and not (cone[0] == self.goal[0] and cone[1] == self.goal[1])
         else:
-            return dist <= self.allowedConeDistance
+            return dist <= self.keepConeDistance
 
     # remove already explored nodes from addition to the frontier
     def removeExpolored(self, children):
@@ -120,4 +135,7 @@ class Navigator():
         self.path = path
 
     def scanForCones(self):
-        self.cones = [(0, -0.1, 'r')]
+        image = self.pilot.robot.get_rgb_image()
+        depth = self.pilot.robot.get_depth_image()
+        self.cones = img.process(image, depth, self.kRGB)
+        print("Found cones: ", self.cones)

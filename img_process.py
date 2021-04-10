@@ -1,33 +1,8 @@
 import cv2
 import numpy as np
 import math
-
-class Cone:
-    '''Class to store found cones'''
-    def __init__(self, color, coord, standing):
-        self.color = color
-        self.coord = coord
-        self.standing = standing
-    def __repr__(self):      # for printing
-        stand = "standing" if self.standing else "fallen"
-        # Python 3
-        # return "position: [{:.3}, {:.3}, {:.3}]".format(self.x, self.y, self.z) + ", color: '" + self.color + "', state: " + stand
-        # Python 2
-        return "\n{position: " + str(self.coord) + ", color: '" + self.color + "', state: " + stand + "}"
-
-class Coordinates:
-    '''Class to store coordinates'''
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-    def __repr__(self):  # for printing
-        # Python 3
-        # return "[{:.3}, {:.3}, {:.3}]".format(self.x, self.y, self.z)
-        # Python 2
-        return "[%.3f, %.3f, %.3f]" % (self.x, self.y, self.z)
-    def numpyfy(self):
-        return np.array([self.x, self.y, self.z])
+import Cone
+import Coordinates
 
 def distance(robot_pos, Cone): # function to get the distance from the cone
     return math.sqrt(pow((Cone.x - robot_pos[0]), 2) + pow((Cone.y - robot_pos[1]), 2) + pow((Cone.z - robot_pos[2]), 2))
@@ -62,7 +37,7 @@ def process(img, depth_img, K_RGB):
                        [0, 0, 0, 1]])
         coord = np.append(coordinates, [1])
         new_coord = np.matmul(T, coord)
-        return Coordinates(new_coord[0], new_coord[1], new_coord[2])
+        return Coordinates.Coordinates(new_coord[0], new_coord[1], new_coord[2])
 
     HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     color_min = [(0, 35, 25), (49, 30, 25), (107, 30, 25)] # for R, G, B in format (h_min, s_min, v_min)
@@ -97,7 +72,7 @@ def process(img, depth_img, K_RGB):
                 z += 0.025 # convert to distance from the middle of the bannsiter
             pos = camera_coord(mid[0], mid[1], z) # position in camera coordinates
             pos = convert_to_robot_coord(pos)
-            new = Cone(color, pos, standing)
+            new = Cone.Cone(color, pos, standing)
             cones.append(new)
     return cones
 
