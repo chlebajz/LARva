@@ -1,6 +1,7 @@
 import pilot
 import img_process as img
 import frontier
+import numpy as np
 import Cone
 import Coordinates as xyz
 
@@ -17,30 +18,31 @@ class Navigator():
         self.acceptedPathLenght = 5
         self.explored = []
         self.kRGB = self.pilot.getRGBKmatrix()
+        self.maxSearchIterations = 2
 
-        self.pilot.rotate2zero() #only for testing
         self.pilot.resetPosition()
         print("INFO: Navigator is now initialized")
 
     def toppleRedCone(self):
+        print("INFO: Cone will be toppled")
         reached = False
         lastPos = (0, 0)
         while (not reached):
             self.setGoal(lastPos)
             self.findPath(self.goal)
-            if (len(self.path) > self.acceptedPathLenght+2):
-                print("Driving only partial path")
+            if (len(self.path) > self.acceptedPathLenght+3):
+                print("INFO: Getting closer to the goal")
                 lastPos = self.path[self.acceptedPathLenght]
-                print(lastPos)
+                print("INFO: I will end up at: ", lastPos)
                 self.pilot.drive(self.path[:self.acceptedPathLenght], False)
-                self.scanForCones()
+                self.reacquireGoal(self.goal, lastPos)
             else:
-                print("Driving to the goal")
+                print("INFO: Cone is close enough, driving straight to it")
                 self.pilot.drive(self.path, True)
                 reached = True
         self.toppledCones.append(self.goal)
         self.goal = None
-        print("Cone toppled")
+        print("INFO: Cone toppled")
 
     def setGoal(self, lastPos):
         redCone = None
@@ -49,13 +51,12 @@ class Navigator():
                 redCone = (self.cones[x].coord.x, self.cones[x].coord.y)
                 break
         if (redCone is None):
-            redCone = self.goal # don't forget to add coordinate transform
-            redCone[0] -= lastPos[0]
-            redCone[1] -= lastPos[1]
-            print("Goal is invisible, using old goal: ", self.goal, "New coords: ", redCone)
+            redCone = self.newGoalFromOld(self.goal, lastPos)
+            print("INFO: Goal is invisible, using old goal: ", self.goal, "New coords: ", redCone)
         self.goal = redCone
 
     def findPath(self, goal):
+        print("INFO: Searching for optimal path")
         queue = frontier.queue(goal)  # initialize the frontier
         queue.push([[(0, 0), 0]], [None, 0, None, 0])  # push the first node into the frontier
         self.explored = []
@@ -74,6 +75,7 @@ class Navigator():
             self.explored.append(current[0])
             children = self.removeExpolored(children)
             queue.push(children, current)
+        print("INFO: Optimal path found!")
 
     def getNextStates(self, state):
         new = []
@@ -134,8 +136,85 @@ class Navigator():
         path.append(self.goal)
         self.path = path
 
-    def scanForCones(self):
-        image = self.pilot.robot.get_rgb_image()
-        depth = self.pilot.robot.get_depth_image()
+    def reacquireGoal(self, oldGoal, lastPos):
+        print("INFO: Reacquiring goal")
+        newGoal = self.newGoalFromOld(oldGoal, lastPos)
+        bearing = self.pilot.getBearing(newGoal)
+        self.pilot.setBearing(bearing)
+        self.scanForCones()
+
+    def newGoalFromOld(self, oldGoal, lastPos):
+        redCone = oldGoal
+        redCone[0] -= lastPos[0]
+        redCone[1] -= lastPos[1]
+        return redCone
+
+    def scanForCones(self, depth):
+        angle = np.pi / 4
+        maxRotations = 7
+        someCones = self.rotatingScan(angle, maxRotations)
+        if (someCones[0] == "Red"):
+            return True
+        elif (someCones[0] == "Some" and depth < self.maxSearchIterations):
+            print("INFO: No red Cones found. Changing vintage point.")
+            self.pilot.rotateByAngle((someCones[1]+1)*angle)
+            self.getConesFromImage()
+            self.goal = self.getNewVintagePoint()
+            self.findPath(self.goal)
+            self.pilot.drive(self.path, False)
+            self.pilot.rotateByAngle(np.pi/2)
+            return self.scanForCones(depth+1)
+        else:
+            return False
+
+    def rotatingScan(self, angle, maxRotations):
+        print("INFO: Scanning for cones")
+        iteration = 0
+        someCones = ("None", -1)
+        while (iteration < maxRotations):
+            self.cones = []
+            self.getConesFromImage()
+            if (self.cones != []):
+                if (someCones[0] == "None"):
+                    someCones = ("Some", iteration)
+                if (self.redConeFound()):
+                    print("INFO: Red cone found")
+                    someCones = ("Red", iteration)
+                    return someCones
+            print("INFO: No red cones found, rotating.")
+            print("")
+            self.pilot.rotateByAngle(angle)
+            iteration += 1
+        return someCones
+
+    def getNewVintagePoint(self):
+        check = False
+        newPoint = (1, 0)
+        while (not check):
+            check = True
+            for cone in self.cones:
+                if(self.isCloseToCone((1, 0), (cone.coord.x, cone.coord.y), False)):
+                    check = False
+                    break
+            if (not check):
+                newPoint = (newPoint[0], newPoint[1]+self.stateDistance)
+        return newPoint
+
+    def redConeFound(self):
+        found = False
+        for cone in self.cones:
+            if (cone.color == 'Red' and cone.standing):
+                found = True
+                break
+        return found
+
+    def getConesFromImage(self):
+        self.pilot.resetPosition()
+        image = np.zeros(0)
+        depth = np.zeros(0)
+        print("INFO: Scanning image for cones... ")
+        while (image is None or depth is None or image.size == 0 or depth.size == 0):
+            image = self.pilot.robot.get_rgb_image()
+            depth = self.pilot.robot.get_depth_image()
         self.cones = img.process(image, depth, self.kRGB)
-        print("Found cones: ", self.cones)
+        print("Scanning complete")
