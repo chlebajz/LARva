@@ -19,7 +19,7 @@ class Pilot():
 #drives to point in a straight line
     def driveTo(self, point, topple):
         if topple:
-            v = 0.8
+            v = 0.1
         else:
             v = 0.1
         prevDist = float('Inf')
