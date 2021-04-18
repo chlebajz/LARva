@@ -18,7 +18,7 @@ class Navigator():
         self.acceptedPathLenght = 5
         self.explored = []
         self.kRGB = self.pilot.getRGBKmatrix()
-        self.maxSearchIterations = 2
+        self.maxSearchIterations = 4
 
         self.pilot.resetPosition()
         print("INFO: Navigator is now initialized")
@@ -27,6 +27,7 @@ class Navigator():
         print("INFO: Cone will be toppled")
         reached = False
         lastPos = (0, 0)
+        check = True
         while (not reached):
             self.setGoal(lastPos)
             self.findPath(self.goal)
@@ -35,14 +36,17 @@ class Navigator():
                 lastPos = self.path[self.acceptedPathLenght]
                 print("INFO: I will end up at: ", lastPos)
                 self.pilot.drive(self.path[:self.acceptedPathLenght], False)
-                self.reacquireGoal(self.goal, lastPos)
+                check = self.scanForCones(0)
             else:
                 print("INFO: Cone is close enough, driving straight to it")
                 self.pilot.drive(self.path, True)
                 reached = True
-        self.toppledCones.append(self.goal)
+                self.toppledCones.append(self.goal)
+                print("INFO: Cone toppled")
+            if (not check):
+                print("ERROR: Lost target")
+                break
         self.goal = None
-        print("INFO: Cone toppled")
 
     def setGoal(self, lastPos):
         redCone = None
@@ -67,7 +71,7 @@ class Navigator():
             if (current is None):  # what to do if the frontier is empty
                 self.path = None
                 break
-            elif (self.isCloseToCone(current[0], goal, False)):  # reached the end state
+            elif (self.isCloseToCone(current[0], goal, False, False)):  # reached the end state
                 self.extractPath(current)
                 break
 
@@ -97,7 +101,7 @@ class Navigator():
         while (x < len(states)):
             rem = False
             for cone in self.cones:
-                if (self.isCloseToCone(states[x][0], (cone.coord.x, cone.coord.y), True)):
+                if (self.isCloseToCone(states[x][0], (cone.coord.x, cone.coord.y), True, False)):
                     states.remove(states[x])
                     remNum += 1
                     rem = True
@@ -105,12 +109,15 @@ class Navigator():
             if not rem:
                 x += 1
 
-    def isCloseToCone(self, state, cone, excludeGoal):
+    def isCloseToCone(self, state, cone, excludeGoal, scanning):
         dist = (((state[0]-cone[0])**2)+((state[1]-cone[1])**2))**0.5
+        keepDist = self.keepConeDistance
+        if (scanning):
+            keepDist = 0.5
         if (excludeGoal):
-            return dist <= self.keepConeDistance and not (cone[0] == self.goal[0] and cone[1] == self.goal[1])
+            return dist <= keepDist and not (cone[0] == self.goal[0] and cone[1] == self.goal[1])
         else:
-            return dist <= self.keepConeDistance
+            return dist <= keepDist
 
     # remove already explored nodes from addition to the frontier
     def removeExpolored(self, children):
@@ -141,12 +148,10 @@ class Navigator():
         newGoal = self.newGoalFromOld(oldGoal, lastPos)
         bearing = self.pilot.getBearing(newGoal)
         self.pilot.setBearing(bearing)
-        self.scanForCones()
+        self.getConesFromImage()
 
     def newGoalFromOld(self, oldGoal, lastPos):
-        redCone = oldGoal
-        redCone[0] -= lastPos[0]
-        redCone[1] -= lastPos[1]
+        redCone = (oldGoal[0] - lastPos[0], oldGoal[1] - lastPos[1])
         return redCone
 
     def scanForCones(self, depth):
@@ -162,7 +167,7 @@ class Navigator():
             self.goal = self.getNewVintagePoint()
             self.findPath(self.goal)
             self.pilot.drive(self.path, False)
-            self.pilot.rotateByAngle(np.pi/2)
+            #self.pilot.rotateByAngle(np.pi/2)
             return self.scanForCones(depth+1)
         else:
             return False
@@ -193,7 +198,7 @@ class Navigator():
         while (not check):
             check = True
             for cone in self.cones:
-                if(self.isCloseToCone((1, 0), (cone.coord.x, cone.coord.y), False)):
+                if(self.isCloseToCone((1, 0), (cone.coord.x, cone.coord.y), False, True)):
                     check = False
                     break
             if (not check):
