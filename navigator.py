@@ -36,10 +36,12 @@ class Navigator():
                 lastPos = self.path[self.acceptedPathLenght]
                 print("INFO: I will end up at: ", lastPos)
                 self.pilot.drive(self.path[:self.acceptedPathLenght], False)
+                self.updateToppledCones(self.pilot.getCurrentPos())
                 check = self.scanForCones(0)
             else:
                 print("INFO: Cone is close enough, driving straight to it")
                 self.pilot.drive(self.path, True)
+                self.updateToppledCones(self.pilot.getCurrentPos())
                 reached = True
                 self.toppledCones.append(self.goal)
                 print("INFO: Cone toppled")
@@ -72,7 +74,7 @@ class Navigator():
                 self.path = None
                 break
             elif (self.isCloseToCone(current[0], goal, False, False)):  # reached the end state
-                self.extractPath(current)
+                self.extractPath(current, goal)
                 break
 
             children = self.getNextStates(current[0])  # uncover the current nodes children [[(x1, y1), cost], [(x2, y2), cost], ... ]
@@ -130,7 +132,7 @@ class Navigator():
         return children
 
     # generate path to node in the proper format
-    def extractPath(self, node):
+    def extractPath(self, node, goal):
         path = []
         oldest = node[0]
 
@@ -140,7 +142,7 @@ class Navigator():
             oldest = node[0]
 
         path.reverse()
-        path.append(self.goal)
+        path.append(goal)
         self.path = path
 
     def reacquireGoal(self, oldGoal, lastPos):
@@ -167,7 +169,7 @@ class Navigator():
             self.goal = self.getNewVintagePoint()
             self.findPath(self.goal)
             self.pilot.drive(self.path, False)
-            #self.pilot.rotateByAngle(np.pi/2)
+            self.updateToppledCones(self.pilot.getCurrentPos())
             return self.scanForCones(depth+1)
         else:
             return False
@@ -189,6 +191,7 @@ class Navigator():
             print("INFO: No red cones found, rotating.")
             print("")
             self.pilot.rotateByAngle(angle)
+            self.updateToppledCones(self.pilot.getCurrentPos())
             iteration += 1
         return someCones
 
@@ -223,3 +226,11 @@ class Navigator():
             depth = self.pilot.robot.get_depth_image()
         self.cones = img.process(image, depth, self.kRGB)
         print("Scanning complete")
+
+    def updateToppledCones(self, newPosition):
+        for x in range(len(self.toppledCones)):
+            X = self.toppledCones[x][0] - newPosition[0]
+            Y = self.toppledCones[x][1] - newPosition[1]
+            X = X*np.cos(newPosition[2])-Y*np.sin(newPosition[2])
+            Y = -X * np.sin(newPosition[2]) + Y * np.cos(newPosition[2])
+            self.toppledCones[x] = (X, Y)
